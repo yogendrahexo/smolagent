@@ -36,6 +36,10 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
+# from smolagents.unrestricted_local_python_executor import UnrestrictedLocalPythonExecutor
+from smolagents.unrestricted_local_python_executor import UnrestrictedLocalPythonExecutor
+
+
 from .agent_types import AgentAudio, AgentImage, AgentType, handle_agent_output_types
 from .default_tools import TOOL_MAPPING, FinalAnswerTool
 from .local_python_executor import BASE_BUILTIN_MODULES, LocalPythonExecutor, PythonExecutor, fix_final_answer_code
@@ -1183,6 +1187,11 @@ class CodeAgent(MultiStepAgent):
                     return DockerExecutor(self.additional_authorized_imports, self.logger, **kwargs)
             case "local":
                 return LocalPythonExecutor(
+                    self.additional_authorized_imports,
+                    max_print_outputs_length=self.max_print_outputs_length,
+                )
+            case "unrestricted_local":
+                return UnrestrictedLocalPythonExecutor(
                     self.additional_authorized_imports,
                     max_print_outputs_length=self.max_print_outputs_length,
                 )

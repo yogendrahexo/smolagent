@@ -116,28 +116,28 @@ BASE_PYTHON_TOOLS = {
 }
 
 DANGEROUS_MODULES = [
-    "builtins",
-    "io",
-    "multiprocessing",
-    "os",
-    "pathlib",
-    "pty",
-    "shutil",
-    "socket",
-    "subprocess",
-    "sys",
+    # "builtins",
+    # "io",
+    # "multiprocessing",
+    # "os",
+    # "pathlib",
+    # "pty",
+    # "shutil",
+    # "socket",
+    # "subprocess",
+    # "sys",
 ]
 
 DANGEROUS_FUNCTIONS = [
-    "builtins.compile",
-    "builtins.eval",
-    "builtins.exec",
-    "builtins.globals",
-    "builtins.locals",
-    "builtins.__import__",
-    "os.popen",
-    "os.system",
-    "posix.system",
+    # "builtins.compile",
+    # "builtins.eval",
+    # "builtins.exec",
+    # "builtins.globals",
+    # "builtins.locals",
+    # "builtins.__import__",
+    # "os.popen",
+    # "os.system",
+    # "posix.system",
 ]
 
 
@@ -667,6 +667,8 @@ def evaluate_call(
             func = custom_tools[func_name]
         elif func_name in ERRORS:
             func = ERRORS[func_name]
+        elif hasattr(builtins, func_name):  # Allow any builtin function
+            func = getattr(builtins, func_name)
         else:
             raise InterpreterError(
                 f"It is not permitted to evaluate other functions than the provided tools or functions defined/imported in previous code (tried to execute {call.func.id})."
@@ -709,11 +711,14 @@ def evaluate_call(
         state["_print_outputs"] += " ".join(map(str, args)) + "\n"
         return None
     else:  # Assume it's a callable object
-        if (inspect.getmodule(func) == builtins) and inspect.isbuiltin(func) and (func not in static_tools.values()):
-            raise InterpreterError(
-                f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
-            )
-        return func(*args, **kwargs)
+        # if (inspect.getmodule(func) == builtins) and inspect.isbuiltin(func) and (func not in static_tools.values()):
+        #     raise InterpreterError(
+        #         f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
+        #     )
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            return None  
 
 
 def evaluate_subscript(
@@ -751,10 +756,16 @@ def evaluate_name(
         return custom_tools[name.id]
     elif name.id in ERRORS:
         return ERRORS[name.id]
+    elif hasattr(builtins, name.id):  # Allow any builtin function
+        return getattr(builtins, name.id)
     close_matches = difflib.get_close_matches(name.id, list(state.keys()))
     if len(close_matches) > 0:
         return state[close_matches[0]]
-    raise InterpreterError(f"The variable `{name.id}` is not defined.")
+
+    state[name.id] = None
+    return state[name.id]
+
+    # raise InterpreterError(f"The variable `{name.id}` is not defined.")
 
 
 def evaluate_condition(
@@ -1235,7 +1246,13 @@ def evaluate_ast(
         )
     state["_operations_count"] += 1
     common_params = (state, static_tools, custom_tools, authorized_imports)
-    if isinstance(expression, ast.Assign):
+    if isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name) and expression.func.id == "final_answer":
+        # Handle final_answer calls specially
+        args = [evaluate_ast(arg, *common_params) for arg in expression.args]
+        if args:
+            return static_tools["final_answer"](args[0])
+        return None
+    elif isinstance(expression, ast.Assign):
         # Assignment -> we evaluate the assignment which should update the state
         # We return the variable assigned as it may be used to determine the final result.
         return evaluate_assign(expression, *common_params)
@@ -1440,7 +1457,7 @@ class PythonExecutor:
     pass
 
 
-class LocalPythonExecutor(PythonExecutor):
+class UnrestrictedLocalPythonExecutor(PythonExecutor):
     def __init__(
         self,
         additional_authorized_imports: List[str],
