@@ -1,8 +1,15 @@
+import time
 from dotenv import load_dotenv
 _ = load_dotenv()
 
 import os
 from smolagents import AzureOpenAIServerModel, CodeAgent
+
+
+from phoenix.otel import register
+import os
+
+os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = "http://localhost:6006"
 
 model_o1 = AzureOpenAIServerModel(
     model_id = os.getenv("AZURE_o1_DEPLOYMENT_NAME"),
@@ -24,12 +31,17 @@ agent = CodeAgent(
     max_steps=40,
     verbosity_level=1,
     name="ml_agent",
-    executor_type="unrestricted_local",
+    executor_type="local",
     description="This is an agent that solves machine learning problems.",
     additional_authorized_imports=["*"] 
 )
 
-def run_ml_project(task_path: str, eval_path: str, project_dir: str) -> None:
+def run_ml_project(task_path: str, eval_path: str, project_dir: str, solution_dir: str) -> None:
+
+    tracer_provider = register(
+        project_name=f"smolagents-house-pricing-o1-restricted",
+        auto_instrument=True
+    )
     """
     Run ML project using the agent with provided task description and evaluation criteria.
     
@@ -37,6 +49,7 @@ def run_ml_project(task_path: str, eval_path: str, project_dir: str) -> None:
         task_path (str): Path to the task description file
         eval_path (str): Path to the evaluation criteria file
         project_dir (str): Path to the project directory containing data files
+        solution_dir (str): Path to the solution directory to save the files
     """
     # Read task description and evaluation criteria
     with open(task_path, 'r') as f:
@@ -44,6 +57,9 @@ def run_ml_project(task_path: str, eval_path: str, project_dir: str) -> None:
     
     with open(eval_path, 'r') as f:
         evaluation_criteria = f.read()
+
+    if not os.path.exists(solution_dir):
+        os.makedirs(solution_dir)
     
     # Construct the prompt
     prompt = f"""
@@ -69,7 +85,7 @@ Please help solve this ML task by:
 3. Developing and training appropriate ML models.
 4. Creating evaluation metrics and validation strategy.
 5. Generating predictions on test data.
-6. Creating two main files:
+6. Creating two main files, Make sure to create all files and artifacts in the {solution_dir} directory:
    - train.py: For data processing, model training, and evaluation.
    - inference.py: For generating predictions on new data and evaluating the model.  This script should print the evaluation scores.
 7. **Run `train.py` to train the model, and then run `inference.py` to generate predictions and evaluate the solution.**
@@ -96,4 +112,4 @@ Environment
 
 
 # running a ml project
-run_ml_project("data/house_pricing/task.md", "data/house_pricing/eval.md", "data/house_pricing")
+run_ml_project("data/house_pricing/task.md", "data/house_pricing/eval.md", "data/house_pricing", "solution/restricted_house_pricing")
