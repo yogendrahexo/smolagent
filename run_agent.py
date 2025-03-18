@@ -27,11 +27,11 @@ model_4o = AzureOpenAIServerModel(
 
 agent = CodeAgent(
     tools=[],
-    model=model_o1,
+    model=model_4o,
     max_steps=40,
     verbosity_level=1,
     name="ml_agent",
-    executor_type="local",
+    executor_type="unrestricted_local",
     description="This is an agent that solves machine learning problems.",
     additional_authorized_imports=["*"] 
 )
@@ -39,7 +39,7 @@ agent = CodeAgent(
 def run_ml_project(task_path: str, eval_path: str, project_dir: str, solution_dir: str) -> None:
 
     tracer_provider = register(
-        project_name=f"smolagents-house-pricing-o1-restricted",
+        project_name=f"smolagents-{project_dir}-{time.strftime('%Y%m%d-%H%M%S')}",
         auto_instrument=True
     )
     """
